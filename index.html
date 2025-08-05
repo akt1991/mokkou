@@ -17,875 +17,872 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* SVGテキストの垂直方向中央揃えの微調整 */
-        text {
-            dominant-baseline: central;
-        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-          import React, { useState, useRef, useEffect, useCallback } from 'react';
+        // --- 各コンポーネントの定義 ---
 
-    // メインアプリケーションコンポーネント
-    const App = () => {
-        // 材料の寸法 (幅, 高さ) を管理するステート
-        const [materialDimensions, setMaterialDimensions] = useState({ width: 0, height: 0 });
-        // 作成する部品のリストを管理するステート
-        // 各部品はID、部品名、幅、高さ、X座標、Y座標、回転角度、色を持つ
-        const [parts, setParts] = useState([]);
-        // 次に生成する部品のIDを管理するステート
-        const [nextPartId, setNextPartId] = useState(1);
-        // ドラッグ中の部品のIDを管理するステート
-        const [draggingPartId, setDraggingPartId] = useState(null);
-        // ドラッグ開始時のマウスと部品のオフセットを管理するステート
-        const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+        // 材料の寸法を入力するコンポーネント
+        const MaterialInput = ({ onSetMaterial }) => {
+            const [width, setWidth] = React.useState('');
+            const [height, setHeight] = React.useState('');
 
-        // 切断線描画モードかどうかを管理するステート
-        const [isDrawingMode, setIsDrawingMode] = useState(false);
-        // 描画された切断線のリストを管理するステート
-        const [cuttingLines, setCuttingLines] = useState([]);
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSetMaterial(Number(width), Number(height));
+            };
 
-        // 材料の板のDOM要素への参照
-        const boardRef = useRef(null);
+            return (
+                <div className="flex-1 bg-gray-50 p-4 rounded-lg shadow-inner">
+                    <h2 className="text-xl font-semibold text-gray-700 mb-4">材料の寸法を入力</h2>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label htmlFor="material-width" className="block text-sm font-medium text-gray-700">
+                                幅 (mm):
+                            </label>
+                            <input
+                                type="number"
+                                id="material-width"
+                                value={width}
+                                onChange={(e) => setWidth(e.target.value)}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="例: 300"
+                                min="1"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="material-height" className="block text-sm font-medium text-gray-700">
+                                長さ (mm):
+                            </label>
+                            <input
+                                type="number"
+                                id="material-height"
+                                value={height}
+                                onChange={(e) => setHeight(e.target.value)}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="例: 900"
+                                min="1"
+                                required
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            className="w-full px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 transition-colors duration-200"
+                        >
+                            材料を設定
+                        </button>
+                    </form>
+                </div>
+            );
+        };
 
-        // 部品の色リスト (ランダムに選択される)
-        const partColors = [
-            'bg-blue-400', 'bg-green-400', 'bg-red-400', 'bg-yellow-400',
-            'bg-purple-400', 'bg-pink-400', 'bg-indigo-400', 'bg-teal-400'
-        ];
+        // 部品の寸法を入力するコンポーネント
+        const PartInput = ({ onAddPart }) => {
+            const [name, setName] = React.useState('');
+            const [width, setWidth] = React.useState('');
+            const [height, setHeight] = React.useState('');
 
-        // 材料の寸法を設定するハンドラー
-        const handleSetMaterial = (width, height) => {
-            if (width > 0 && height > 0) {
-                setMaterialDimensions({ width, height });
-                // 材料の寸法が変わったら、部品の位置と線をリセットする
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onAddPart(name || `部品${Math.floor(Math.random() * 1000)}`, Number(width), Number(height));
+                setName('');
+                setWidth('');
+                setHeight('');
+            };
+
+            return (
+                <div className="flex-1 bg-gray-50 p-4 rounded-lg shadow-inner">
+                    <h2 className="text-xl font-semibold text-gray-700 mb-4">部品を追加</h2>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label htmlFor="part-name" className="block text-sm font-medium text-gray-700">
+                                部品名 (任意):
+                            </label>
+                            <input
+                                type="text"
+                                id="part-name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="例: 天板"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="part-width" className="block text-sm font-medium text-gray-700">
+                                幅 (mm):
+                            </label>
+                            <input
+                                type="number"
+                                id="part-width"
+                                value={width}
+                                onChange={(e) => setWidth(e.target.value)}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="例: 100"
+                                min="1"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="part-height" className="block text-sm font-medium text-gray-700">
+                                長さ (mm):
+                            </label>
+                            <input
+                                type="number"
+                                id="part-height"
+                                value={height}
+                                onChange={(e) => setHeight(e.target.value)}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="例: 250"
+                                min="1"
+                                required
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            className="w-full px-4 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition-colors duration-200"
+                        >
+                            部品を追加
+                        </button>
+                    </form>
+                </div>
+            );
+        };
+
+        // 個々の部品を表示するコンポーネント
+        const Part = ({ part, scale, onMouseDown, rotatePart, handleDeletePart, isDrawingMode }) => {
+            // 部品の表示上の幅と高さを計算 (回転を考慮)
+            const displayWidth = part.rotation === 0 ? part.width : part.height;
+            const displayHeight = part.rotation === 0 ? part.height : part.width;
+
+            return (
+                <div
+                    className={`absolute ${part.color} border border-gray-700 flex items-center justify-center text-white text-xs font-bold select-none transition-shadow duration-100 ease-in-out hover:shadow-lg ${
+                        isDrawingMode ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing' // 描画モードではドラッグカーソルを無効化
+                    }`}
+                    style={{
+                        left: `${part.x * scale}px`,
+                        top: `${part.y * scale}px`,
+                        width: `${displayWidth * scale}px`,
+                        height: `${displayHeight * scale}px`,
+                    }}
+                    onMouseDown={(e) => !isDrawingMode && onMouseDown(e, part)} // 描画モードでない場合のみ、部品のドラッグを有効にする
+                    onContextMenu={(e) => {
+                        e.preventDefault(); // 右クリックメニューを防止
+                        !isDrawingMode && rotatePart(part.id); // 描画モードでない場合のみ右クリックで回転
+                    }}
+                >
+                    <div className="text-center p-1">
+                        <span className="block">{part.name}</span>
+                        <span className="block">{displayWidth}x{displayHeight}mm</span>
+                    </div>
+                    {/* 削除ボタン */}
+                    {!isDrawingMode && ( // 描画モードでない場合のみ表示
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation(); // 親要素へのイベント伝播を停止 (ドラッグ防止)
+                                handleDeletePart(part.id);
+                            }}
+                            className="absolute -top-2 -right-2 bg-gray-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold hover:bg-red-600 transition-colors duration-200 cursor-pointer"
+                            title="部品を削除"
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
+            );
+        };
+
+        // 材料の板と部品の配置を表示するコンポーネント
+        const CuttingBoard = ({
+            materialDimensions,
+            parts,
+            setParts,
+            draggingPartId,
+            setDraggingPartId,
+            dragOffset,
+            setDragOffset,
+            movePart,
+            rotatePart,
+            handleDeletePart, // 新規: 削除ハンドラーを受け取る
+            boardRef,
+            isDrawingMode, // 新しいプロップ
+            cuttingLines, // 新しいプロップ
+            setCuttingLines // 新しいプロップ
+        }) => {
+            // 描画スケール (1mmあたりのピクセル数)
+            const scale = 0.5; // 1mm = 0.5px (調整可能)
+            const TEXT_OFFSET_PX = 10; // テキストを寸法線からずらすピクセル数
+            const TEXT_OFFSET_MM = TEXT_OFFSET_PX / scale; // ミリメートルに変換
+            const EXTENSION_LINE_LENGTH_MM = 10; // 補助線の長さ (ミリメートル)
+            const STACKING_OFFSET_MM = 15; // 寸法線を積み重ねる際のオフセット (ミリメートル)
+
+            // 材料の板のピクセル寸法
+            const boardWidthPx = materialDimensions.width * scale;
+            const boardHeightPx = materialDimensions.height * scale;
+
+            // 線描画の開始点を管理するステート
+            const [currentLineStart, setCurrentLineStart] = React.useState(null);
+            // 描画中の線（プレビュー用）を管理するステート
+            const [previewLine, setPreviewLine] = React.useState(null);
+
+            // 部品の表示寸法（回転考慮）を取得するヘルパー関数
+            const getDisplayDims = React.useCallback((part) => ({
+                x: part.x,
+                y: part.y,
+                width: part.rotation === 0 ? part.width : part.height,
+                height: part.rotation === 0 ? part.height : part.width,
+            }), []);
+
+            // 部品の重なりやはみ出しをチェックする関数
+            const checkCollisionsAndOverflow = React.useCallback(() => {
+                const warnings = [];
+                const currentParts = parts;
+
+                currentParts.forEach((part1, index1) => {
+                    const p1 = getDisplayDims(part1);
+
+                    // 材料からのX軸方向のはみ出しチェック
+                    if (p1.x < 0 || p1.x + p1.width > materialDimensions.width) {
+                        warnings.push(`${part1.name} (幅 ${part1.width}mm x 長さ ${part1.height}mm) が材料の左右からはみ出しています！`);
+                    }
+                    // 材料からのY軸方向のはみ出しチェック
+                    if (p1.y < 0 || p1.y + p1.height > materialDimensions.height) {
+                        warnings.push(`${part1.name} (幅 ${part1.width}mm x 長さ ${part1.height}mm) が材料の上下からはみ出しています！`);
+                    }
+
+                    // 他の部品との重なりチェック
+                    for (let index2 = index1 + 1; index2 < currentParts.length; index2++) {
+                        const part2 = currentParts[index2];
+                        const p2 = getDisplayDims(part2);
+
+                        // 矩形同士の衝突判定
+                        if (
+                            p1.x < p2.x + p2.width &&
+                            p1.x + p1.width > p2.x &&
+                            p1.y < p2.y + p2.height &&
+                            p1.y + p1.height > p2.y
+                        ) {
+                            warnings.push(`${part1.name} と ${part2.name} が重なっています！`);
+                        }
+                    }
+                });
+
+                if (warnings.length > 0) {
+                    console.warn('配置に関する警告:', warnings);
+                }
+            }, [parts, materialDimensions, getDisplayDims]);
+
+            // 寸法を計算する関数
+            const calculateGapDimensions = React.useCallback(() => {
+                const dimensions = [];
+                const tolerance = 0.5; // 厳密なアライメントと微小なギャップを無視するための許容誤差
+
+                // Helper to add a dimension
+                const addDimension = (type, startX, startY, endX, endY, value, textX, textY) => {
+                    dimensions.push({
+                        type, startX, startY, endX, endY, value, textX, textY
+                    });
+                };
+
+                // 1. 材料の端から部品までの寸法
+                parts.forEach((part) => {
+                    const p = getDisplayDims(part);
+
+                    // Left edge to part
+                    if (p.x > tolerance) {
+                        addDimension('horizontal', 0, p.y + p.height / 2, p.x, p.y + p.height / 2, p.x,
+                                     p.x / 2, p.y + p.height / 2 - TEXT_OFFSET_MM
+                        );
+                    }
+                    // Top edge to part
+                    if (p.y > tolerance) {
+                        addDimension('vertical', p.x + p.width / 2, 0, p.x + p.width / 2, p.y, p.y,
+                                     p.x + p.width / 2 - TEXT_OFFSET_MM, p.y / 2
+                        );
+                    }
+                    // Part right edge to material right edge
+                    if (p.x + p.width < materialDimensions.width - tolerance) {
+                        addDimension('horizontal', p.x + p.width, p.y + p.height / 2, materialDimensions.width, p.y + p.height / 2,
+                                     materialDimensions.width - (p.x + p.width),
+                                     p.x + p.width + (materialDimensions.width - (p.x + p.width)) / 2, p.y + p.height / 2 - TEXT_OFFSET_MM
+                        );
+                    }
+                    // Part bottom edge to material bottom edge
+                    if (p.y + p.height < materialDimensions.height - tolerance) {
+                        addDimension('vertical', p.x + p.width / 2, p.y + p.height, p.x + p.width / 2, materialDimensions.height,
+                                     materialDimensions.height - (p.y + p.height),
+                                     p.x + p.width / 2 - TEXT_OFFSET_MM, p.y + p.height + (materialDimensions.height - (p.y + p.height)) / 2
+                        );
+                    }
+                });
+
+                // 2. 部品と部品の間の寸法
+                for (let i = 0; i < parts.length; i++) {
+                    const part1 = parts[i];
+                    const p1 = getDisplayDims(part1);
+
+                    for (let j = 0; j < parts.length; j++) {
+                        if (i === j) continue;
+                        const part2 = parts[j];
+                        const p2 = getDisplayDims(part2);
+
+                        // Horizontal gap (part1 left of part2)
+                        if (p1.x + p1.width < p2.x - tolerance) {
+                            const yOverlapStart = Math.max(p1.y, p2.y);
+                            const yOverlapEnd = Math.min(p1.y + p1.height, p2.y + p2.height);
+                            const yOverlap = yOverlapEnd - yOverlapStart;
+
+                            if (yOverlap > 20) { // Significant vertical overlap
+                                const gap = p2.x - (p1.x + p1.width);
+                                if (gap > tolerance) {
+                                    const midY = yOverlapStart + yOverlap / 2;
+                                    addDimension('horizontal', p1.x + p1.width, midY, p2.x, midY, gap,
+                                                 p1.x + p1.width + gap / 2, midY - TEXT_OFFSET_MM
+                                    );
+                                }
+                            }
+                        }
+
+                        // Vertical gap (part1 above part2)
+                        if (p1.y + p1.height < p2.y - tolerance) {
+                            const xOverlapStart = Math.max(p1.x, p2.x);
+                            const xOverlapEnd = Math.min(p1.x + p1.width, p2.x + p2.width);
+                            const xOverlap = xOverlapEnd - xOverlapStart;
+
+                            if (xOverlap > 20) { // Significant horizontal overlap
+                                const gap = p2.y - (p1.y + p1.height);
+                                if (gap > tolerance) {
+                                    const midX = xOverlapStart + xOverlap / 2;
+                                    addDimension('vertical', midX, p1.y + p1.height, midX, p2.y, gap,
+                                                 midX - TEXT_OFFSET_MM, p1.y + p1.height + gap / 2
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                // Apply stacking logic to prevent overlaps
+                const finalDimensions = [];
+                const horizontalGroups = {}; // { roundedMidY: [dims] }
+                const verticalGroups = {};   // { roundedMidX: [dims] }
+
+                // Group dimensions that are close to each other
+                dimensions.forEach(dim => {
+                    if (dim.type === 'horizontal') {
+                        // Group by a rounded midY to identify dimensions that are on roughly the same horizontal line
+                        const groupKey = Math.round(dim.startY / STACKING_OFFSET_MM) * STACKING_OFFSET_MM;
+                        if (!horizontalGroups[groupKey]) horizontalGroups[groupKey] = [];
+                        horizontalGroups[groupKey].push(dim);
+                    } else { // vertical
+                        // Group by a rounded midX for vertical dimensions
+                        const groupKey = Math.round(dim.startX / STACKING_OFFSET_MM) * STACKING_OFFSET_MM;
+                        if (!verticalGroups[groupKey]) verticalGroups[groupKey] = [];
+                        verticalGroups[groupKey].push(dim);
+                    }
+                });
+
+                // Process horizontal groups
+                Object.values(horizontalGroups).forEach(group => {
+                    group.sort((a, b) => a.startX - b.startX); // Sort by startX for consistent stacking
+                    group.forEach((dim, i) => {
+                        const offset = i * STACKING_OFFSET_MM; // Apply incremental offset
+                        dim.startY += offset;
+                        dim.endY += offset;
+                        dim.textY += offset;
+                        finalDimensions.push(dim);
+                    });
+                });
+
+                // Process vertical groups
+                Object.values(verticalGroups).forEach(group => {
+                    group.sort((a, b) => a.startY - b.startY); // Sort by startY for consistent stacking
+                    group.forEach((dim, i) => {
+                        const offset = i * STACKING_OFFSET_MM; // Apply incremental offset
+                        dim.startX += offset;
+                        dim.endX += offset;
+                        dim.textX += offset;
+                        finalDimensions.push(dim);
+                    });
+                });
+
+                return finalDimensions.filter(dim => dim.value > 0.5); // 0.5mm以下の微小な寸法は表示しない
+            }, [parts, materialDimensions, getDisplayDims, TEXT_OFFSET_MM, STACKING_OFFSET_MM]); // STACKING_OFFSET_MM を依存配列に追加
+
+            // 計算された寸法を保持するステート
+            const [gapDimensions, setGapDimensions] = React.useState([]);
+
+            // 部品や材料の寸法が変更されたときに寸法を再計算
+            React.useEffect(() => {
+                if (materialDimensions.width > 0 && materialDimensions.height > 0) {
+                    setGapDimensions(calculateGapDimensions());
+                } else {
+                    setGapDimensions([]); // 材料が設定されていない場合は寸法をクリア
+                }
+            }, [parts, materialDimensions, calculateGapDimensions]);
+
+
+            // ドラッグ開始時の処理
+            const handleMouseDown = React.useCallback((e) => {
+                // 右クリックの場合はドラッグ/描画しない
+                if (e.button === 2) return;
+
+                const boardRect = boardRef.current.getBoundingClientRect();
+                const mouseX = e.clientX - boardRect.left;
+                const mouseY = e.clientY - boardRect.top;
+
+                if (isDrawingMode) {
+                    // 描画モードの場合
+                    setCurrentLineStart({ x: mouseX / scale, y: mouseY / scale });
+                    setPreviewLine({ startX: mouseX / scale, startY: mouseY / scale, endX: mouseX / scale, endY: mouseY / scale });
+                } else {
+                    // 部品移動モードの場合: クリックされた部品を探す
+                    const clickedPart = parts.find(part => {
+                        const p = getDisplayDims(part); // 部品の現在の表示寸法を取得
+                        const partLeftPx = p.x * scale;
+                        const partTopPx = p.y * scale;
+                        const partRightPx = (p.x + p.width) * scale;
+                        const partBottomPx = (p.y + p.height) * scale;
+
+                        // マウス座標が部品の範囲内にあるかチェック
+                        return mouseX >= partLeftPx && mouseX <= partRightPx &&
+                               mouseY >= partTopPx && mouseY <= partBottomPx;
+                    });
+
+                    if (clickedPart) {
+                        setDraggingPartId(clickedPart.id);
+                        setDragOffset({
+                            x: mouseX - (clickedPart.x * scale),
+                            y: mouseY - (clickedPart.y * scale),
+                        });
+                    }
+                }
+            }, [isDrawingMode, parts, getDisplayDims, setDraggingPartId, setDragOffset, boardRef, scale]);
+
+            // ドラッグ中の処理
+            const handleMouseMove = React.useCallback((e) => {
+                const boardRect = boardRef.current.getBoundingClientRect();
+                const mouseX = e.clientX - boardRect.left;
+                const mouseY = e.clientY - boardRect.top;
+
+                if (isDrawingMode && currentLineStart) {
+                    // 描画モードで線を描画中の場合
+                    setPreviewLine(prev => ({
+                        ...prev,
+                        endX: mouseX / scale,
+                        endY: mouseY / scale
+                    }));
+                } else if (!isDrawingMode && draggingPartId !== null) {
+                    // 部品移動モードで部品をドラッグ中の場合 (既存のロジック)
+                    let newXPx = mouseX - dragOffset.x;
+                    let newYPx = mouseY - dragOffset.y;
+
+                    const currentPart = parts.find(p => p.id === draggingPartId);
+                    if (!currentPart) return;
+
+                    const partWidthPx = (currentPart.rotation === 0 ? currentPart.width : currentPart.height) * scale;
+                    const partHeightPx = (currentPart.rotation === 0 ? currentPart.height : currentPart.width) * scale;
+
+                    newXPx = Math.max(0, Math.min(newXPx, boardWidthPx - partWidthPx));
+                    newYPx = Math.max(0, Math.min(newYPx, boardHeightPx - partHeightPx));
+
+                    movePart(draggingPartId, newXPx / scale, newYPx / scale);
+                }
+            }, [isDrawingMode, currentLineStart, draggingPartId, dragOffset, parts, movePart, boardWidthPx, boardHeightPx, scale]);
+
+            // ドラッグ終了時の処理
+            const handleMouseUp = React.useCallback(() => {
+                if (isDrawingMode && currentLineStart) {
+                    // 描画モードで線を描画終了した場合
+                    if (previewLine.startX !== previewLine.endX || previewLine.startY !== previewLine.endY) {
+                        setCuttingLines(prevLines => [
+                            ...prevLines,
+                            {
+                                startX: currentLineStart.x,
+                                startY: currentLineStart.y,
+                                endX: previewLine.endX,
+                                endY: previewLine.endY
+                            }
+                        ]);
+                    }
+                    setCurrentLineStart(null);
+                    setPreviewLine(null);
+                } else if (!isDrawingMode && draggingPartId !== null) {
+                    // 部品移動モードで部品のドラッグを終了した場合 (既存のロジック)
+                    setDraggingPartId(null);
+                }
+            }, [isDrawingMode, currentLineStart, previewLine, setCuttingLines, draggingPartId]);
+
+            // マウスイベントリスナーを設定
+            React.useEffect(() => {
+                const boardElement = boardRef.current;
+                if (boardElement) {
+                    // boardElementに直接マウスイベントを設定
+                    boardElement.addEventListener('mousemove', handleMouseMove);
+                    boardElement.addEventListener('mouseup', handleMouseUp);
+                    // グローバルなmouseupイベントもリッスンして、ボード外でマウスを離してもドラッグ/描画を終了させる
+                    window.addEventListener('mouseup', handleMouseUp);
+                }
+
+                return () => {
+                    if (boardElement) {
+                        boardElement.removeEventListener('mousemove', handleMouseMove);
+                        boardElement.removeEventListener('mouseup', handleMouseUp);
+                    }
+                    window.removeEventListener('mouseup', handleMouseUp);
+                };
+            }, [handleMouseMove, handleMouseUp]);
+
+            // 部品の位置や回転が変更されるたびにチェックを実行
+            React.useEffect(() => {
+                checkCollisionsAndOverflow();
+            }, [parts, checkCollisionsAndOverflow]);
+
+            return (
+                <div className="flex flex-col items-center">
+                    <h2 className="text-2xl font-semibold text-gray-700 mb-4">材料どり図</h2>
+                    <div
+                        ref={boardRef}
+                        className="relative border-4 border-gray-700 bg-gray-200 shadow-inner overflow-hidden"
+                        style={{
+                            width: `${boardWidthPx}px`,
+                            height: `${boardHeightPx}px`,
+                            minWidth: '200px', // 最小幅
+                            minHeight: '200px', // 最小高さ
+                            maxWidth: '90vw', // 画面幅の90%まで
+                            maxHeight: '80vh', // 画面高さの80%まで
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e)} // ボード全体でマウスダウンイベントを拾う
+                        onContextMenu={(e) => e.preventDefault()} // 右クリックメニューを無効化
+                    >
+                        {/* 材料の寸法表示 */}
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-gray-800 text-sm font-bold">
+                            幅: {materialDimensions.width}mm
+                        </div>
+                        <div className="absolute top-1/2 -translate-y-1/2 left-2 rotate-90 origin-top-left -ml-4 text-gray-800 text-sm font-bold">
+                            長さ: {materialDimensions.height}mm
+                        </div>
+
+                        {/* 各部品をレンダリング */}
+                        {parts.map(part => (
+                            <Part
+                                key={part.id}
+                                part={part}
+                                scale={scale}
+                                onMouseDown={(e) => handleMouseDown(e, part)} // Part側からhandleMouseDownを呼び出す
+                                rotatePart={rotatePart}
+                                handleDeletePart={handleDeletePart} // 新規: 削除ハンドラーをPartに渡す
+                                isDrawingMode={isDrawingMode} // 描画モードをPartに伝える
+                            />
+                        ))}
+
+                        {/* 切断線と寸法線を描画するSVGレイヤー */}
+                        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                            {/* 既存の切断線 */}
+                            {cuttingLines.map((line, index) => (
+                                <line
+                                    key={`cut-line-${index}`}
+                                    x1={line.startX * scale}
+                                    y1={line.startY * scale}
+                                    x2={line.endX * scale}
+                                    y2={line.endY * scale}
+                                    stroke="black"
+                                    strokeWidth="2"
+                                />
+                            ))}
+                            {previewLine && ( // 描画中の線を表示
+                                <line
+                                    x1={previewLine.startX * scale}
+                                    y1={previewLine.startY * scale}
+                                    x2={previewLine.endX * scale}
+                                    y2={previewLine.endY * scale}
+                                    stroke="red"
+                                    strokeWidth="2"
+                                    strokeDasharray="4 2" // プレビューは点線
+                                />
+                            )}
+
+                            {/* 新規: 寸法線とテキスト */}
+                            {gapDimensions.map((dim, index) => (
+                                <React.Fragment key={`dim-${index}`}>
+                                    {/* 寸法線本体 */}
+                                    <line
+                                        x1={dim.startX * scale}
+                                        y1={dim.startY * scale}
+                                        x2={dim.endX * scale}
+                                        y2={dim.endY * scale}
+                                        stroke="#00008B" // 寸法線の色を濃い青に
+                                        strokeWidth="1"
+                                        strokeDasharray="2 2" // 点線
+                                    />
+                                    {/* 補助線 (開始点側) */}
+                                    {dim.type === 'horizontal' ? (
+                                        <line
+                                            x1={dim.startX * scale}
+                                            y1={dim.startY * scale - EXTENSION_LINE_LENGTH_MM * scale}
+                                            x2={dim.startX * scale}
+                                            y2={dim.startY * scale + EXTENSION_LINE_LENGTH_MM * scale}
+                                            stroke="#00008B"
+                                            strokeWidth="0.5"
+                                        />
+                                    ) : (
+                                        <line
+                                            x1={dim.startX * scale - EXTENSION_LINE_LENGTH_MM * scale}
+                                            y1={dim.startY * scale}
+                                            x2={dim.startX * scale + EXTENSION_LINE_LENGTH_MM * scale}
+                                            y2={dim.startY * scale}
+                                            stroke="#00008B"
+                                            strokeWidth="0.5"
+                                        />
+                                    )}
+                                    {/* 補助線 (終了点側) */}
+                                    {dim.type === 'horizontal' ? (
+                                        <line
+                                            x1={dim.endX * scale}
+                                            y1={dim.endY * scale - EXTENSION_LINE_LENGTH_MM * scale}
+                                            x2={dim.endX * scale}
+                                            y2={dim.endY * scale + EXTENSION_LINE_LENGTH_MM * scale}
+                                            stroke="#00008B"
+                                            strokeWidth="0.5"
+                                        />
+                                    ) : (
+                                        <line
+                                            x1={dim.endX * scale - EXTENSION_LINE_LENGTH_MM * scale}
+                                            y1={dim.endY * scale}
+                                            x2={dim.endX * scale + EXTENSION_LINE_LENGTH_MM * scale}
+                                            y2={dim.endY * scale}
+                                            stroke="#00008B"
+                                            strokeWidth="0.5"
+                                        />
+                                    )}
+
+                                    {/* 寸法テキスト */}
+                                    <text
+                                        x={dim.textX * scale}
+                                        y={dim.textY * scale}
+                                        fill="#00008B" // テキストの色を濃い青に
+                                        fontSize="12" // フォントサイズを少し大きく
+                                        textAnchor="middle" // テキストを中央揃え
+                                        dominantBaseline="middle" // テキストを垂直方向中央揃え
+                                        // 垂直方向の寸法線の場合、テキストを回転させて配置
+                                        transform={dim.type === 'vertical' ? `rotate(-90 ${dim.textX * scale},${dim.textY * scale})` : ''}
+                                    >
+                                        {Math.round(dim.value)}mm
+                                    </text>
+                                </React.Fragment>
+                            ))}
+                        </svg>
+                    </div>
+                    <p className="mt-4 text-gray-600 text-sm">
+                        「部品を移動する」モードでは部品をドラッグして配置、右クリックで回転できます。
+                    </p>
+                    <p className="mt-2 text-gray-600 text-sm">
+                        「切断線を描画する」モードでは、材料の上でドラッグすると線が引けます。
+                    </p>
+                    <p className="mt-2 text-blue-600 text-sm font-semibold">
+                        (部品間や材料の端との間の寸法が自動で表示されます)
+                    </p>
+                    <p className="mt-2 text-red-600 text-sm font-semibold">
+                        (部品が重なったり、材料からはみ出したりすると、ブラウザのコンソールに警告が表示されます)
+                    </p>
+                </div>
+            );
+        };
+
+        // --- メインアプリケーションコンポーネント ---
+        const App = () => {
+            // 材料の寸法 (幅, 高さ) を管理するステート
+            const [materialDimensions, setMaterialDimensions] = React.useState({ width: 0, height: 0 });
+            // 作成する部品のリストを管理するステート
+            // 各部品はID、部品名、幅、高さ、X座標、Y座標、回転角度、色を持つ
+            const [parts, setParts] = React.useState([]);
+            // 次に生成する部品のIDを管理するステート
+            const [nextPartId, setNextPartId] = React.useState(1);
+            // ドラッグ中の部品のIDを管理するステート
+            const [draggingPartId, setDraggingPartId] = React.useState(null);
+            // ドラッグ開始時のマウスと部品のオフセットを管理するステート
+            const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 });
+
+            // 切断線描画モードかどうかを管理するステート
+            const [isDrawingMode, setIsDrawingMode] = React.useState(false);
+            // 描画された切断線のリストを管理するステート
+            const [cuttingLines, setCuttingLines] = React.useState([]);
+
+            // 材料の板のDOM要素への参照
+            const boardRef = React.useRef(null);
+
+            // 部品の色リスト (ランダムに選択される)
+            const partColors = [
+                'bg-blue-400', 'bg-green-400', 'bg-red-400', 'bg-yellow-400',
+                'bg-purple-400', 'bg-pink-400', 'bg-indigo-400', 'bg-teal-400'
+            ];
+
+            // 材料の寸法を設定するハンドラー
+            const handleSetMaterial = (width, height) => {
+                if (width > 0 && height > 0) {
+                    setMaterialDimensions({ width, height });
+                    // 材料の寸法が変わったら、部品の位置と線をリセットする
+                    setParts([]);
+                    setCuttingLines([]); // 線もリセット
+                    setNextPartId(1);
+                } else {
+                    alert('材料の幅と長さは正の値を入力してください。');
+                }
+            };
+
+            // 新しい部品を追加するハンドラー
+            const handleAddPart = (name, width, height) => {
+                if (width > 0 && height > 0) {
+                    // 材料の寸法が設定されていない場合は警告
+                    if (materialDimensions.width === 0 || materialDimensions.height === 0) {
+                        alert('先に材料の寸法を設定してください。');
+                        return;
+                    }
+
+                    // 部品が材料の寸法より大きい場合は警告
+                    if (width > materialDimensions.width || height > materialDimensions.height) {
+                        alert('部品の寸法が材料の寸法を超えています。');
+                        return;
+                    }
+
+                    // ランダムな色を選択
+                    const color = partColors[Math.floor(Math.random() * partColors.length)];
+
+                    setParts(prevParts => [
+                        ...prevParts,
+                        {
+                            id: nextPartId,
+                            name,
+                            width,
+                            height,
+                            x: 0, // 初期位置
+                            y: 0, // 初期位置
+                            rotation: 0, // 初期回転角度 (0度)
+                            color,
+                        },
+                    ]);
+                    setNextPartId(prevId => prevId + 1);
+                } else {
+                    alert('部品の幅と長さは正の値を入力してください。');
+                }
+            };
+
+            // 部品の位置を更新するハンドラー
+            const movePart = React.useCallback((id, newX, newY) => {
+                setParts(prevParts =>
+                    prevParts.map(part =>
+                        part.id === id ? { ...part, x: newX, y: newY } : part
+                    )
+                );
+            }, []);
+
+            // 部品を回転させるハンドラー
+            const rotatePart = React.useCallback((id) => {
+                setParts(prevParts =>
+                    prevParts.map(part =>
+                        part.id === id
+                            ? {
+                                  ...part,
+                                  rotation: part.rotation === 0 ? 90 : 0, // 0度と90度を切り替える
+                              }
+                            : part
+                    )
+                );
+            }, []);
+
+            // 部品を削除するハンドラー
+            const handleDeletePart = React.useCallback((id) => {
+                setParts(prevParts => prevParts.filter(part => part.id !== id));
+            }, []);
+
+            // 全ての部品と材料の寸法をリセットするハンドラー
+            const resetAll = () => {
+                setMaterialDimensions({ width: 0, height: 0 });
                 setParts([]);
                 setCuttingLines([]); // 線もリセット
                 setNextPartId(1);
-            } else {
-                alert('材料の幅と長さは正の値を入力してください。');
-            }
-        };
-
-        // 新しい部品を追加するハンドラー
-        const handleAddPart = (name, width, height) => {
-            if (width > 0 && height > 0) {
-                // 材料の寸法が設定されていない場合は警告
-                if (materialDimensions.width === 0 || materialDimensions.height === 0) {
-                    alert('先に材料の寸法を設定してください。');
-                    return;
-                }
-
-                // 部品が材料の寸法より大きい場合は警告
-                if (width > materialDimensions.width || height > materialDimensions.height) {
-                    alert('部品の寸法が材料の寸法を超えています。');
-                    return;
-                }
-
-                // ランダムな色を選択
-                const color = partColors[Math.floor(Math.random() * partColors.length)];
-
-                setParts(prevParts => [
-                    ...prevParts,
-                    {
-                        id: nextPartId,
-                        name,
-                        width,
-                        height,
-                        x: 0, // 初期位置
-                        y: 0, // 初期位置
-                        rotation: 0, // 初期回転角度 (0度)
-                        color,
-                    },
-                ]);
-                setNextPartId(prevId => prevId + 1);
-            } else {
-                alert('部品の幅と長さは正の値を入力してください。');
-            }
-        };
-
-        // 部品の位置を更新するハンドラー
-        const movePart = useCallback((id, newX, newY) => {
-            setParts(prevParts =>
-                prevParts.map(part =>
-                    part.id === id ? { ...part, x: newX, y: newY } : part
-                )
-            );
-        }, []);
-
-        // 部品を回転させるハンドラー
-        const rotatePart = useCallback((id) => {
-            setParts(prevParts =>
-                prevParts.map(part =>
-                    part.id === id
-                        ? {
-                              ...part,
-                              rotation: part.rotation === 0 ? 90 : 0, // 0度と90度を切り替える
-                          }
-                        : part
-                )
-            );
-        }, []);
-
-        // 部品を削除するハンドラー
-        const handleDeletePart = useCallback((id) => {
-            setParts(prevParts => prevParts.filter(part => part.id !== id));
-        }, []);
-
-        // 全ての部品と材料の寸法をリセットするハンドラー
-        const resetAll = () => {
-            setMaterialDimensions({ width: 0, height: 0 });
-            setParts([]);
-            setCuttingLines([]); // 線もリセット
-            setNextPartId(1);
-            setDraggingPartId(null);
-            setDragOffset({ x: 0, y: 0 });
-            setIsDrawingMode(false); // モードもリセット
-        };
-
-        // 切断線をクリアするハンドラー
-    const clearLines = () => {
-        setCuttingLines([]);
-    };
-
-        return (
-            <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center font-inter">
-                <h1 className="text-3xl font-bold text-gray-800 mb-6">木材加工 材料どり図作成アプリ</h1>
-                <p className="text-gray-600 mb-8 text-center">
-                    材料の寸法と必要な部品の寸法を入力して、効率的な配置を考えてみましょう！
-                </p>
-
-                <div className="w-full max-w-4xl bg-white rounded-lg shadow-xl p-6 mb-8 flex flex-col lg:flex-row gap-6">
-                    {/* 材料入力コンポーネント */}
-                    <MaterialInput onSetMaterial={handleSetMaterial} />
-                    {/* 部品入力コンポーネント */}
-                    <PartInput onAddPart={handleAddPart} />
-                </div>
-
-                <div className="flex flex-wrap justify-center gap-4 mb-8">
-                    {/* モード切り替えボタン */}
-                    <button
-                        onClick={() => setIsDrawingMode(!isDrawingMode)}
-                        className={`px-6 py-3 font-semibold rounded-lg shadow-md transition-colors duration-200 ${
-                            isDrawingMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-300 text-gray-800 hover:bg-gray-400'
-                        }`}
-                    >
-                        {isDrawingMode ? '部品を移動する' : '切断線を描画する'}
-                    </button>
-
-                    {/* 線をクリアボタン */}
-                    <button
-                        onClick={clearLines}
-                        className="px-6 py-3 bg-orange-500 text-white font-semibold rounded-lg shadow-md hover:bg-orange-600 transition-colors duration-200"
-                    >
-                        線をクリア
-                    </button>
-
-                    {/* 全てリセットボタン */}
-                    <button
-                        onClick={resetAll}
-                        className="px-6 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 transition-colors duration-200"
-                    >
-                        全てリセット
-                    </button>
-                </div>
-
-
-                {/* 材料の板と部品の表示エリア */}
-                {materialDimensions.width > 0 && materialDimensions.height > 0 && (
-                    <CuttingBoard
-                        materialDimensions={materialDimensions}
-                        parts={parts}
-                        setParts={setParts}
-                        draggingPartId={draggingPartId}
-                        setDraggingPartId={setDraggingPartId}
-                        dragOffset={dragOffset}
-                        setDragOffset={setDragOffset}
-                        movePart={movePart}
-                        rotatePart={rotatePart}
-                        handleDeletePart={handleDeletePart} // 新規: 削除ハンドラーを渡す
-                        boardRef={boardRef}
-                        isDrawingMode={isDrawingMode} // 描画モードを渡す
-                        cuttingLines={cuttingLines} // 切断線を渡す
-                        setCuttingLines={setCuttingLines} // 切断線更新関数を渡す
-                    />
-                )}
-            </div>
-        );
-    };
-
-    // 材料の寸法を入力するコンポーネント
-    const MaterialInput = ({ onSetMaterial }) => {
-        const [width, setWidth] = useState('');
-        const [height, setHeight] = useState('');
-
-        const handleSubmit = (e) => {
-            e.preventDefault();
-            onSetMaterial(Number(width), Number(height));
-        };
-
-        return (
-            <div className="flex-1 bg-gray-50 p-4 rounded-lg shadow-inner">
-                <h2 className="text-xl font-semibold text-gray-700 mb-4">材料の寸法を入力</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="material-width" className="block text-sm font-medium text-gray-700">
-                            幅 (mm):
-                        </label>
-                        <input
-                            type="number"
-                            id="material-width"
-                            value={width}
-                            onChange={(e) => setWidth(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            placeholder="例: 300"
-                            min="1"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="material-height" className="block text-sm font-medium text-gray-700">
-                            長さ (mm):
-                        </label>
-                        <input
-                            type="number"
-                            id="material-height"
-                            value={height}
-                            onChange={(e) => setHeight(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            placeholder="例: 900"
-                            min="1"
-                            required
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="w-full px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 transition-colors duration-200"
-                    >
-                        材料を設定
-                    </button>
-                </form>
-            </div>
-        );
-    };
-
-    // 部品の寸法を入力するコンポーネント
-    const PartInput = ({ onAddPart }) => {
-        const [name, setName] = useState('');
-        const [width, setWidth] = useState('');
-        const [height, setHeight] = useState('');
-
-        const handleSubmit = (e) => {
-            e.preventDefault();
-            onAddPart(name || `部品${Math.floor(Math.random() * 1000)}`, Number(width), Number(height));
-            setName('');
-            setWidth('');
-            setHeight('');
-        };
-
-        return (
-            <div className="flex-1 bg-gray-50 p-4 rounded-lg shadow-inner">
-                <h2 className="text-xl font-semibold text-gray-700 mb-4">部品を追加</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="part-name" className="block text-sm font-medium text-gray-700">
-                            部品名 (任意):
-                        </label>
-                        <input
-                            type="text"
-                            id="part-name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            placeholder="例: 天板"
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="part-width" className="block text-sm font-medium text-gray-700">
-                            幅 (mm):
-                        </label>
-                        <input
-                            type="number"
-                            id="part-width"
-                            value={width}
-                            onChange={(e) => setWidth(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            placeholder="例: 100"
-                            min="1"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="part-height" className="block text-sm font-medium text-gray-700">
-                            長さ (mm):
-                        </label>
-                        <input
-                            type="number"
-                            id="part-height"
-                            value={height}
-                            onChange={(e) => setHeight(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            placeholder="例: 250"
-                            min="1"
-                            required
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="w-full px-4 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition-colors duration-200"
-                    >
-                        部品を追加
-                    </button>
-                </form>
-            </div>
-        );
-    };
-
-    // 材料の板と部品の配置を表示するコンポーネント
-    const CuttingBoard = ({
-        materialDimensions,
-        parts,
-        setParts,
-        draggingPartId,
-        setDraggingPartId,
-        dragOffset,
-        setDragOffset,
-        movePart,
-        rotatePart,
-        handleDeletePart, // 新規: 削除ハンドラーを受け取る
-        boardRef,
-        isDrawingMode, // 新しいプロップ
-        cuttingLines, // 新しいプロップ
-        setCuttingLines // 新しいプロップ
-    }) => {
-        // 描画スケール (1mmあたりのピクセル数)
-        const scale = 0.5; // 1mm = 0.5px (調整可能)
-        const TEXT_OFFSET_PX = 10; // テキストを寸法線からずらすピクセル数
-        const TEXT_OFFSET_MM = TEXT_OFFSET_PX / scale; // ミリメートルに変換
-        const EXTENSION_LINE_LENGTH_MM = 10; // 補助線の長さ (ミリメートル)
-        const STACKING_OFFSET_MM = 15; // 寸法線を積み重ねる際のオフセット (ミリメートル)
-
-        // 材料の板のピクセル寸法
-        const boardWidthPx = materialDimensions.width * scale;
-        const boardHeightPx = materialDimensions.height * scale;
-
-        // 線描画の開始点を管理するステート
-        const [currentLineStart, setCurrentLineStart] = useState(null);
-        // 描画中の線（プレビュー用）を管理するステート
-        const [previewLine, setPreviewLine] = useState(null);
-
-        // 部品の表示寸法（回転考慮）を取得するヘルパー関数
-        const getDisplayDims = useCallback((part) => ({
-            x: part.x,
-            y: part.y,
-            width: part.rotation === 0 ? part.width : part.height,
-            height: part.rotation === 0 ? part.height : part.width,
-        }), []);
-
-        // 部品の重なりやはみ出しをチェックする関数
-        const checkCollisionsAndOverflow = useCallback(() => {
-            const warnings = [];
-            const currentParts = parts;
-
-            currentParts.forEach((part1, index1) => {
-                const p1 = getDisplayDims(part1);
-
-                // 材料からのX軸方向のはみ出しチェック
-                if (p1.x < 0 || p1.x + p1.width > materialDimensions.width) {
-                    warnings.push(`${part1.name} (幅 ${part1.width}mm x 長さ ${part1.height}mm) が材料の左右からはみ出しています！`);
-                }
-                // 材料からのY軸方向のはみ出しチェック
-                if (p1.y < 0 || p1.y + p1.height > materialDimensions.height) {
-                    warnings.push(`${part1.name} (幅 ${part1.width}mm x 長さ ${part1.height}mm) が材料の上下からはみ出しています！`);
-                }
-
-                // 他の部品との重なりチェック
-                for (let index2 = index1 + 1; index2 < currentParts.length; index2++) {
-                    const part2 = currentParts[index2];
-                    const p2 = getDisplayDims(part2);
-
-                    // 矩形同士の衝突判定
-                    if (
-                        p1.x < p2.x + p2.width &&
-                        p1.x + p1.width > p2.x &&
-                        p1.y < p2.y + p2.height &&
-                        p1.y + p1.height > p2.y
-                    ) {
-                        warnings.push(`${part1.name} と ${part2.name} が重なっています！`);
-                    }
-                }
-            });
-
-            if (warnings.length > 0) {
-                console.warn('配置に関する警告:', warnings);
-            }
-        }, [parts, materialDimensions, getDisplayDims]);
-
-        // 寸法を計算する関数
-        const calculateGapDimensions = useCallback(() => {
-            const dimensions = [];
-            const tolerance = 0.5; // 厳密なアライメントと微小なギャップを無視するための許容誤差
-
-            // Helper to add a dimension
-            const addDimension = (type, startX, startY, endX, endY, value, textX, textY) => {
-                dimensions.push({
-                    type, startX, startY, endX, endY, value, textX, textY
-                });
-            };
-
-            // 1. 材料の端から部品までの寸法
-            parts.forEach((part) => {
-                const p = getDisplayDims(part);
-
-                // Left edge to part
-                if (p.x > tolerance) {
-                    addDimension('horizontal', 0, p.y + p.height / 2, p.x, p.y + p.height / 2, p.x,
-                                 p.x / 2, p.y + p.height / 2 - TEXT_OFFSET_MM
-                    );
-                }
-                // Top edge to part
-                if (p.y > tolerance) {
-                    addDimension('vertical', p.x + p.width / 2, 0, p.x + p.width / 2, p.y, p.y,
-                                 p.x + p.width / 2 - TEXT_OFFSET_MM, p.y / 2
-                    );
-                }
-                // Part right edge to material right edge
-                if (p.x + p.width < materialDimensions.width - tolerance) {
-                    addDimension('horizontal', p.x + p.width, p.y + p.height / 2, materialDimensions.width, p.y + p.height / 2,
-                                 materialDimensions.width - (p.x + p.width),
-                                 p.x + p.width + (materialDimensions.width - (p.x + p.width)) / 2, p.y + p.height / 2 - TEXT_OFFSET_MM
-                    );
-                }
-                // Part bottom edge to material bottom edge
-                if (p.y + p.height < materialDimensions.height - tolerance) {
-                    addDimension('vertical', p.x + p.width / 2, p.y + p.height, p.x + p.width / 2, materialDimensions.height,
-                                 materialDimensions.height - (p.y + p.height),
-                                 p.x + p.width / 2 - TEXT_OFFSET_MM, p.y + p.height + (materialDimensions.height - (p.y + p.height)) / 2
-                    );
-                }
-            });
-
-            // 2. 部品と部品の間の寸法
-            for (let i = 0; i < parts.length; i++) {
-                const part1 = parts[i];
-                const p1 = getDisplayDims(part1);
-
-                for (let j = 0; j < parts.length; j++) {
-                    if (i === j) continue;
-                    const part2 = parts[j];
-                    const p2 = getDisplayDims(part2);
-
-                    // Horizontal gap (part1 left of part2)
-                    if (p1.x + p1.width < p2.x - tolerance) {
-                        const yOverlapStart = Math.max(p1.y, p2.y);
-                        const yOverlapEnd = Math.min(p1.y + p1.height, p2.y + p2.height);
-                        const yOverlap = yOverlapEnd - yOverlapStart;
-
-                        if (yOverlap > 20) { // Significant vertical overlap
-                            const gap = p2.x - (p1.x + p1.width);
-                            if (gap > tolerance) {
-                                const midY = yOverlapStart + yOverlap / 2;
-                                addDimension('horizontal', p1.x + p1.width, midY, p2.x, midY, gap,
-                                             p1.x + p1.width + gap / 2, midY - TEXT_OFFSET_MM
-                                );
-                            }
-                        }
-                    }
-
-                    // Vertical gap (part1 above part2)
-                    if (p1.y + p1.height < p2.y - tolerance) {
-                        const xOverlapStart = Math.max(p1.x, p2.x);
-                        const xOverlapEnd = Math.min(p1.x + p1.width, p2.x + p2.width);
-                        const xOverlap = xOverlapEnd - xOverlapStart;
-
-                        if (xOverlap > 20) { // Significant horizontal overlap
-                            const gap = p2.y - (p1.y + p1.height);
-                            if (gap > tolerance) {
-                                const midX = xOverlapStart + xOverlap / 2;
-                                addDimension('vertical', midX, p1.y + p1.height, midX, p2.y, gap,
-                                             midX - TEXT_OFFSET_MM, p1.y + p1.height + gap / 2
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-            // Apply stacking logic to prevent overlaps
-            const finalDimensions = [];
-            const horizontalGroups = {}; // { roundedMidY: [dims] }
-            const verticalGroups = {};   // { roundedMidX: [dims] }
-
-            // Group dimensions that are close to each other
-            dimensions.forEach(dim => {
-                if (dim.type === 'horizontal') {
-                    // Group by a rounded midY to identify dimensions that are on roughly the same horizontal line
-                    const groupKey = Math.round(dim.startY / STACKING_OFFSET_MM) * STACKING_OFFSET_MM;
-                    if (!horizontalGroups[groupKey]) horizontalGroups[groupKey] = [];
-                    horizontalGroups[groupKey].push(dim);
-                } else { // vertical
-                    // Group by a rounded midX for vertical dimensions
-                    const groupKey = Math.round(dim.startX / STACKING_OFFSET_MM) * STACKING_OFFSET_MM;
-                    if (!verticalGroups[groupKey]) verticalGroups[groupKey] = [];
-                    verticalGroups[groupKey].push(dim);
-                }
-            });
-
-            // Process horizontal groups
-            Object.values(horizontalGroups).forEach(group => {
-                group.sort((a, b) => a.startX - b.startX); // Sort by startX for consistent stacking
-                group.forEach((dim, i) => {
-                    const offset = i * STACKING_OFFSET_MM; // Apply incremental offset
-                    dim.startY += offset;
-                    dim.endY += offset;
-                    dim.textY += offset;
-                    finalDimensions.push(dim);
-                });
-            });
-
-            // Process vertical groups
-            Object.values(verticalGroups).forEach(group => {
-                group.sort((a, b) => a.startY - b.startY); // Sort by startY for consistent stacking
-                group.forEach((dim, i) => {
-                    const offset = i * STACKING_OFFSET_MM; // Apply incremental offset
-                    dim.startX += offset;
-                    dim.endX += offset;
-                    dim.textX += offset;
-                    finalDimensions.push(dim);
-                });
-            });
-
-            return finalDimensions.filter(dim => dim.value > 0.5); // 0.5mm以下の微小な寸法は表示しない
-        }, [parts, materialDimensions, getDisplayDims, TEXT_OFFSET_MM, STACKING_OFFSET_MM]); // STACKING_OFFSET_MM を依存配列に追加
-
-        // 計算された寸法を保持するステート
-        const [gapDimensions, setGapDimensions] = useState([]);
-
-        // 部品や材料の寸法が変更されたときに寸法を再計算
-        useEffect(() => {
-            if (materialDimensions.width > 0 && materialDimensions.height > 0) {
-                setGapDimensions(calculateGapDimensions());
-            } else {
-                setGapDimensions([]); // 材料が設定されていない場合は寸法をクリア
-            }
-        }, [parts, materialDimensions, calculateGapDimensions]);
-
-
-        // ドラッグ開始時の処理
-        const handleMouseDown = useCallback((e) => {
-            // 右クリックの場合はドラッグ/描画しない
-            if (e.button === 2) return;
-
-            const boardRect = boardRef.current.getBoundingClientRect();
-            const mouseX = e.clientX - boardRect.left;
-            const mouseY = e.clientY - boardRect.top;
-
-            if (isDrawingMode) {
-                // 描画モードの場合
-                setCurrentLineStart({ x: mouseX / scale, y: mouseY / scale });
-                setPreviewLine({ startX: mouseX / scale, startY: mouseY / scale, endX: mouseX / scale, endY: mouseY / scale });
-            } else {
-                // 部品移動モードの場合: クリックされた部品を探す
-                const clickedPart = parts.find(part => {
-                    const p = getDisplayDims(part); // 部品の現在の表示寸法を取得
-                    const partLeftPx = p.x * scale;
-                    const partTopPx = p.y * scale;
-                    const partRightPx = (p.x + p.width) * scale;
-                    const partBottomPx = (p.y + p.height) * scale;
-
-                    // マウス座標が部品の範囲内にあるかチェック
-                    return mouseX >= partLeftPx && mouseX <= partRightPx &&
-                           mouseY >= partTopPx && mouseY <= partBottomPx;
-                });
-
-                if (clickedPart) {
-                    setDraggingPartId(clickedPart.id);
-                    setDragOffset({
-                        x: mouseX - (clickedPart.x * scale),
-                        y: mouseY - (clickedPart.y * scale),
-                    });
-                }
-            }
-        }, [isDrawingMode, parts, getDisplayDims, setDraggingPartId, setDragOffset, boardRef, scale]);
-
-        // ドラッグ中の処理
-        const handleMouseMove = useCallback((e) => {
-            const boardRect = boardRef.current.getBoundingClientRect();
-            const mouseX = e.clientX - boardRect.left;
-            const mouseY = e.clientY - boardRect.top;
-
-            if (isDrawingMode && currentLineStart) {
-                // 描画モードで線を描画中の場合
-                setPreviewLine(prev => ({
-                    ...prev,
-                    endX: mouseX / scale,
-                    endY: mouseY / scale
-                }));
-            } else if (!isDrawingMode && draggingPartId !== null) {
-                // 部品移動モードで部品をドラッグ中の場合 (既存のロジック)
-                let newXPx = mouseX - dragOffset.x;
-                let newYPx = mouseY - dragOffset.y;
-
-                const currentPart = parts.find(p => p.id === draggingPartId);
-                if (!currentPart) return;
-
-                const partWidthPx = (currentPart.rotation === 0 ? currentPart.width : currentPart.height) * scale;
-                const partHeightPx = (currentPart.rotation === 0 ? currentPart.height : currentPart.width) * scale;
-
-                newXPx = Math.max(0, Math.min(newXPx, boardWidthPx - partWidthPx));
-                newYPx = Math.max(0, Math.min(newYPx, boardHeightPx - partHeightPx));
-
-                movePart(draggingPartId, newXPx / scale, newYPx / scale);
-            }
-        }, [isDrawingMode, currentLineStart, draggingPartId, dragOffset, parts, movePart, boardWidthPx, boardHeightPx, scale]);
-
-        // ドラッグ終了時の処理
-        const handleMouseUp = useCallback(() => {
-            if (isDrawingMode && currentLineStart) {
-                // 描画モードで線を描画終了した場合
-                if (previewLine.startX !== previewLine.endX || previewLine.startY !== previewLine.endY) {
-                    setCuttingLines(prevLines => [
-                        ...prevLines,
-                        {
-                            startX: currentLineStart.x,
-                            startY: currentLineStart.y,
-                            endX: previewLine.endX,
-                            endY: previewLine.endY
-                        }
-                    ]);
-                }
-                setCurrentLineStart(null);
-                setPreviewLine(null);
-            } else if (!isDrawingMode && draggingPartId !== null) {
-                // 部品移動モードで部品のドラッグを終了した場合 (既存のロジック)
                 setDraggingPartId(null);
-            }
-        }, [isDrawingMode, currentLineStart, previewLine, setCuttingLines, draggingPartId]);
-
-        // マウスイベントリスナーを設定
-        useEffect(() => {
-            const boardElement = boardRef.current;
-            if (boardElement) {
-                // boardElementに直接マウスイベントを設定
-                boardElement.addEventListener('mousemove', handleMouseMove);
-                boardElement.addEventListener('mouseup', handleMouseUp);
-                // グローバルなmouseupイベントもリッスンして、ボード外でマウスを離してもドラッグ/描画を終了させる
-                window.addEventListener('mouseup', handleMouseUp);
-            }
-
-            return () => {
-                if (boardElement) {
-                    boardElement.removeEventListener('mousemove', handleMouseMove);
-                    boardElement.removeEventListener('mouseup', handleMouseUp);
-                }
-                window.removeEventListener('mouseup', handleMouseUp);
+                setDragOffset({ x: 0, y: 0 });
+                setIsDrawingMode(false); // モードもリセット
             };
-        }, [handleMouseMove, handleMouseUp]);
 
-        // 部品の位置や回転が変更されるたびにチェックを実行
-        useEffect(() => {
-            checkCollisionsAndOverflow();
-        }, [parts, checkCollisionsAndOverflow]);
+            // 切断線をクリアするハンドラー
+            const clearLines = () => {
+                setCuttingLines([]);
+            };
 
-        return (
-            <div className="flex flex-col items-center">
-                <h2 className="text-2xl font-semibold text-gray-700 mb-4">材料どり図</h2>
-                <div
-                    ref={boardRef}
-                    className="relative border-4 border-gray-700 bg-gray-200 shadow-inner overflow-hidden"
-                    style={{
-                        width: `${boardWidthPx}px`,
-                        height: `${boardHeightPx}px`,
-                        minWidth: '200px', // 最小幅
-                        minHeight: '200px', // 最小高さ
-                        maxWidth: '90vw', // 画面幅の90%まで
-                        maxHeight: '80vh', // 画面高さの80%まで
-                    }}
-                    onMouseDown={(e) => handleMouseDown(e)} // ボード全体でマウスダウンイベントを拾う
-                    onContextMenu={(e) => e.preventDefault()} // 右クリックメニューを無効化
-                >
-                    {/* 材料の寸法表示 */}
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 text-gray-800 text-sm font-bold">
-                        幅: {materialDimensions.width}mm
-                    </div>
-                    <div className="absolute top-1/2 -translate-y-1/2 left-2 rotate-90 origin-top-left -ml-4 text-gray-800 text-sm font-bold">
-                        長さ: {materialDimensions.height}mm
+            return (
+                <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center font-inter">
+                    <h1 className="text-3xl font-bold text-gray-800 mb-6">木材加工 材料どり図作成アプリ</h1>
+                    <p className="text-gray-600 mb-8 text-center">
+                        材料の寸法と必要な部品の寸法を入力して、効率的な配置を考えてみましょう！
+                    </p>
+
+                    <div className="w-full max-w-4xl bg-white rounded-lg shadow-xl p-6 mb-8 flex flex-col lg:flex-row gap-6">
+                        {/* 材料入力コンポーネント */}
+                        <MaterialInput onSetMaterial={handleSetMaterial} />
+                        {/* 部品入力コンポーネント */}
+                        <PartInput onAddPart={handleAddPart} />
                     </div>
 
-                    {/* 各部品をレンダリング */}
-                    {parts.map(part => (
-                        <Part
-                            key={part.id}
-                            part={part}
-                            scale={scale}
-                            onMouseDown={(e) => handleMouseDown(e, part)} // Part側からhandleMouseDownを呼び出す
+                    <div className="flex flex-wrap justify-center gap-4 mb-8">
+                        {/* モード切り替えボタン */}
+                        <button
+                            onClick={() => setIsDrawingMode(!isDrawingMode)}
+                            className={`px-6 py-3 font-semibold rounded-lg shadow-md transition-colors duration-200 ${
+                                isDrawingMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-300 text-gray-800 hover:bg-gray-400'
+                            }`}
+                        >
+                            {isDrawingMode ? '部品を移動する' : '切断線を描画する'}
+                        </button>
+
+                        {/* 線をクリアボタン */}
+                        <button
+                            onClick={clearLines}
+                            className="px-6 py-3 bg-orange-500 text-white font-semibold rounded-lg shadow-md hover:bg-orange-600 transition-colors duration-200"
+                        >
+                            線をクリア
+                        </button>
+
+                        {/* 全てリセットボタン */}
+                        <button
+                            onClick={resetAll}
+                            className="px-6 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 transition-colors duration-200"
+                        >
+                            全てリセット
+                        </button>
+                    </div>
+
+
+                    {/* 材料の板と部品の表示エリア */}
+                    {materialDimensions.width > 0 && materialDimensions.height > 0 && (
+                        <CuttingBoard
+                            materialDimensions={materialDimensions}
+                            parts={parts}
+                            setParts={setParts}
+                            draggingPartId={draggingPartId}
+                            setDraggingPartId={setDraggingPartId}
+                            dragOffset={dragOffset}
+                            setDragOffset={setDragOffset}
+                            movePart={movePart}
                             rotatePart={rotatePart}
-                            handleDeletePart={handleDeletePart} // 新規: 削除ハンドラーをPartに渡す
-                            isDrawingMode={isDrawingMode} // 描画モードをPartに伝える
+                            handleDeletePart={handleDeletePart} // 新規: 削除ハンドラーを渡す
+                            boardRef={boardRef}
+                            isDrawingMode={isDrawingMode} // 描画モードを渡す
+                            cuttingLines={cuttingLines} // 切断線を渡す
+                            setCuttingLines={setCuttingLines} // 切断線更新関数を渡す
                         />
-                    ))}
-
-                    {/* 切断線と寸法線を描画するSVGレイヤー */}
-                    <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                        {/* 既存の切断線 */}
-                        {cuttingLines.map((line, index) => (
-                            <line
-                                key={`cut-line-${index}`}
-                                x1={line.startX * scale}
-                                y1={line.startY * scale}
-                                x2={line.endX * scale}
-                                y2={line.endY * scale}
-                                stroke="black"
-                                strokeWidth="2"
-                            />
-                        ))}
-                        {previewLine && ( // 描画中の線を表示
-                            <line
-                                x1={previewLine.startX * scale}
-                                y1={previewLine.startY * scale}
-                                x2={previewLine.endX * scale}
-                                y2={previewLine.endY * scale}
-                                stroke="red"
-                                strokeWidth="2"
-                                strokeDasharray="4 2" // プレビューは点線
-                            />
-                        )}
-
-                        {/* 新規: 寸法線とテキスト */}
-                        {gapDimensions.map((dim, index) => (
-                            <React.Fragment key={`dim-${index}`}>
-                                {/* 寸法線本体 */}
-                                <line
-                                    x1={dim.startX * scale}
-                                    y1={dim.startY * scale}
-                                    x2={dim.endX * scale}
-                                    y2={dim.endY * scale}
-                                    stroke="#00008B" // 寸法線の色を濃い青に
-                                    strokeWidth="1"
-                                    strokeDasharray="2 2" // 点線
-                                />
-                                {/* 補助線 (開始点側) */}
-                                {dim.type === 'horizontal' ? (
-                                    <line
-                                        x1={dim.startX * scale}
-                                        y1={dim.startY * scale - EXTENSION_LINE_LENGTH_MM * scale}
-                                        x2={dim.startX * scale}
-                                        y2={dim.startY * scale + EXTENSION_LINE_LENGTH_MM * scale}
-                                        stroke="#00008B"
-                                        strokeWidth="0.5"
-                                    />
-                                ) : (
-                                    <line
-                                        x1={dim.startX * scale - EXTENSION_LINE_LENGTH_MM * scale}
-                                        y1={dim.startY * scale}
-                                        x2={dim.startX * scale + EXTENSION_LINE_LENGTH_MM * scale}
-                                        y2={dim.startY * scale}
-                                        stroke="#00008B"
-                                        strokeWidth="0.5"
-                                    />
-                                )}
-                                {/* 補助線 (終了点側) */}
-                                {dim.type === 'horizontal' ? (
-                                    <line
-                                        x1={dim.endX * scale}
-                                        y1={dim.endY * scale - EXTENSION_LINE_LENGTH_MM * scale}
-                                        x2={dim.endX * scale}
-                                        y2={dim.endY * scale + EXTENSION_LINE_LENGTH_MM * scale}
-                                        stroke="#00008B"
-                                        strokeWidth="0.5"
-                                    />
-                                ) : (
-                                    <line
-                                        x1={dim.endX * scale - EXTENSION_LINE_LENGTH_MM * scale}
-                                        y1={dim.endY * scale}
-                                        x2={dim.endX * scale + EXTENSION_LINE_LENGTH_MM * scale}
-                                        y2={dim.endY * scale}
-                                        stroke="#00008B"
-                                        strokeWidth="0.5"
-                                    />
-                                )}
-
-                                {/* 寸法テキスト */}
-                                <text
-                                    x={dim.textX * scale}
-                                    y={dim.textY * scale}
-                                    fill="#00008B" // テキストの色を濃い青に
-                                    fontSize="12" // フォントサイズを少し大きく
-                                    textAnchor="middle" // テキストを中央揃え
-                                    dominantBaseline="middle" // テキストを垂直方向中央揃え
-                                    // 垂直方向の寸法線の場合、テキストを回転させて配置
-                                    transform={dim.type === 'vertical' ? `rotate(-90 ${dim.textX * scale},${dim.textY * scale})` : ''}
-                                >
-                                    {Math.round(dim.value)}mm
-                                </text>
-                            </React.Fragment>
-                        ))}
-                    </svg>
+                    )}
                 </div>
-                <p className="mt-4 text-gray-600 text-sm">
-                    「部品を移動する」モードでは部品をドラッグして配置、右クリックで回転できます。
-                </p>
-                <p className="mt-2 text-gray-600 text-sm">
-                    「切断線を描画する」モードでは、材料の上でドラッグすると線が引けます。
-                </p>
-                <p className="mt-2 text-blue-600 text-sm font-semibold">
-                    (部品間や材料の端との間の寸法が自動で表示されます)
-                </p>
-                <p className="mt-2 text-red-600 text-sm font-semibold">
-                    (部品が重なったり、材料からはみ出したりすると、ブラウザのコンソールに警告が表示されます)
-                </p>
-            </div>
-        );
-    };
+            );
+        };
 
-    // 個々の部品を表示するコンポーネント
-    const Part = ({ part, scale, onMouseDown, rotatePart, handleDeletePart, isDrawingMode }) => {
-        // 部品の表示上の幅と高さを計算 (回転を考慮)
-        const displayWidth = part.rotation === 0 ? part.width : part.height;
-        const displayHeight = part.rotation === 0 ? part.height : part.width;
-
-        return (
-            <div
-                className={`absolute ${part.color} border border-gray-700 flex items-center justify-center text-white text-xs font-bold select-none transition-shadow duration-100 ease-in-out hover:shadow-lg ${
-                    isDrawingMode ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing' // 描画モードではドラッグカーソルを無効化
-                }`}
-                style={{
-                    left: `${part.x * scale}px`,
-                    top: `${part.y * scale}px`,
-                    width: `${displayWidth * scale}px`,
-                    height: `${displayHeight * scale}px`,
-                }}
-                onMouseDown={(e) => !isDrawingMode && onMouseDown(e, part)} // 描画モードでない場合のみ、部品のドラッグを有効にする
-                onContextMenu={(e) => {
-                    e.preventDefault(); // 右クリックメニューを防止
-                    !isDrawingMode && rotatePart(part.id); // 描画モードでない場合のみ右クリックで回転
-                }}
-            >
-                <div className="text-center p-1">
-                    <span className="block">{part.name}</span>
-                    <span className="block">{displayWidth}x{displayHeight}mm</span>
-                </div>
-                {/* 削除ボタン */}
-                {!isDrawingMode && ( // 描画モードでない場合のみ表示
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation(); // 親要素へのイベント伝播を停止 (ドラッグ防止)
-                            handleDeletePart(part.id);
-                        }}
-                        className="absolute -top-2 -right-2 bg-gray-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold hover:bg-red-600 transition-colors duration-200 cursor-pointer"
-                        title="部品を削除"
-                    >
-                        ×
-                    </button>
-                )}
-            </div>
-        );
-    };
-
-    export default App;
-    
+        // --- アプリのレンダリング ---
+        // React 18 の推奨される方法でアプリをレンダリングします
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
